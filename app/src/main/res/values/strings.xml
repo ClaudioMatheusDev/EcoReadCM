@@ -1,3 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">EcoReadCM</string>
+    <string name="app_name">EcoRead</string>
+    <string name="proprietarios">Proprietários</string>
+    <string name="apartamentos">Apartamentos</string>
+    <string name="leituras">Leituras</string>
+    <string name="nova_leitura">Nova Leitura</string>
+    <string name="salvar">Salvar</string>
+    <string name="cancelar">Cancelar</string>
+    <string name="excluir">Excluir</string>
+    <string name="editar">Editar</string>
+    <string name="media_luz">Média Luz</string>
+    <string name="media_gas">Média Gás</string>
+    <string name="ultima_leitura_luz">Última leitura luz</string>
+    <string name="ultima_leitura_gas">Última leitura gás</string>
+    <string name="ultimos_3_meses">Últimos 3 meses</string>
+    <string name="ultimos_6_meses">Últimos 6 meses</string>
+    <string name="leituras_do_mes">Leituras do Mês</string>
+    <string name="coletadas">Coletadas</string>
+    <string name="pendentes">Pendentes</string>
+    <string name="total">Total</string>
+    <string name="buscar_proprietario">Buscar proprietário...</string>
+    <string name="nome">Nome</string>
+    <string name="cpf">CPF</string>
+    <string name="contato">Contato</string>
+    <string name="numero_apartamento">Número</string>
+    <string name="bloco">Bloco (opcional)</string>
+    <string name="valor_luz">Eletricidade (kWh)</string>
+    <string name="valor_gas">Gás (m³)</string>
 </resources>

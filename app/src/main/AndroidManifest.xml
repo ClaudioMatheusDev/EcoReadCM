@@ -1,26 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+    package="com.example.ecoreadcm">
 
     <application
         android:allowBackup="true"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
+        android:label="EcoRead"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.EcoReadCM">
+        android:theme="@style/Theme.EcoRead">
+
         <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:windowSoftInputMode="adjustResize">
+            android:name=".ui.MainActivity"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-    </application>
 
+        <activity android:name=".ui.ProprietariosActivity" />
+        <activity android:name=".ui.ProprietarioDetalheActivity" />
+        <activity android:name=".ui.ApartamentosActivity" />
+        <activity android:name=".ui.ApartamentoDetalheActivity" />
+        <activity android:name=".ui.NovaLeituraActivity" />
+        <activity android:name=".ui.LeiturasDoMesActivity" />
+
+    </application>
 </manifest>
