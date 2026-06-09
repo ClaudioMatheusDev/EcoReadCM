@@ -27,7 +27,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Unidades"
+            android:text="@string/apartamentos"
             android:textSize="15sp"
             android:textStyle="bold"
             android:textColor="@color/textPrimary" />
@@ -42,6 +42,41 @@
 
     </LinearLayout>
 
+    <!-- Barra de busca -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/surface"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="10dp">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@android:drawable/ic_menu_search"
+            android:layout_marginEnd="8dp"
+            android:contentDescription="Buscar" />
+
+        <EditText
+            android:id="@+id/etBusca"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/buscar_apartamento"
+            android:textSize="13sp"
+            android:background="@null"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:singleLine="true" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/divider" />
+
     <TextView
         android:id="@+id/tvContagem"
         android:layout_width="match_parent"
@@ -54,12 +89,24 @@
         android:textSize="12sp"
         android:textColor="@color/textSecondary" />
 
+    <!-- Estado vazio -->
+    <TextView
+        android:id="@+id/tvEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/sem_apartamentos"
+        android:textSize="14sp"
+        android:textColor="@color/textHint"
+        android:gravity="center"
+        android:padding="32dp"
+        android:visibility="gone" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvApartamentos"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:paddingLeft="12dp"
-        android:paddingRight="12dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
         android:paddingTop="6dp"
         android:paddingBottom="16dp"
         android:clipToPadding="false" />

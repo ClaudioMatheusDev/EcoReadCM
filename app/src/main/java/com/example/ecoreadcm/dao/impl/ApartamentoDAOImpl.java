@@ -144,4 +144,50 @@ public class ApartamentoDAOImpl implements IApartamentoDAO {
     public boolean apartamentoExiste(long id) {
         return buscarPorId(id) != null;
     }
+
+    @Override
+    public boolean verificarDuplicado(String numero, String bloco, long excluirId) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor c = null;
+        try {
+            boolean blocoVazio = bloco == null || bloco.trim().isEmpty();
+            String sql;
+            String[] args;
+            if (blocoVazio) {
+                if (excluirId > 0) {
+                    sql = "SELECT COUNT(*) FROM " + DatabaseHelper.TABLE_APARTAMENTO +
+                          " WHERE " + DatabaseHelper.COL_APT_NUMERO + " = ? AND (" +
+                          DatabaseHelper.COL_APT_BLOCO + " IS NULL OR " +
+                          DatabaseHelper.COL_APT_BLOCO + " = '') AND " +
+                          DatabaseHelper.COL_APT_ID + " != ?";
+                    args = new String[]{numero, String.valueOf(excluirId)};
+                } else {
+                    sql = "SELECT COUNT(*) FROM " + DatabaseHelper.TABLE_APARTAMENTO +
+                          " WHERE " + DatabaseHelper.COL_APT_NUMERO + " = ? AND (" +
+                          DatabaseHelper.COL_APT_BLOCO + " IS NULL OR " +
+                          DatabaseHelper.COL_APT_BLOCO + " = '')";
+                    args = new String[]{numero};
+                }
+            } else {
+                if (excluirId > 0) {
+                    sql = "SELECT COUNT(*) FROM " + DatabaseHelper.TABLE_APARTAMENTO +
+                          " WHERE " + DatabaseHelper.COL_APT_NUMERO + " = ? AND " +
+                          DatabaseHelper.COL_APT_BLOCO + " = ? AND " +
+                          DatabaseHelper.COL_APT_ID + " != ?";
+                    args = new String[]{numero, bloco.trim(), String.valueOf(excluirId)};
+                } else {
+                    sql = "SELECT COUNT(*) FROM " + DatabaseHelper.TABLE_APARTAMENTO +
+                          " WHERE " + DatabaseHelper.COL_APT_NUMERO + " = ? AND " +
+                          DatabaseHelper.COL_APT_BLOCO + " = ?";
+                    args = new String[]{numero, bloco.trim()};
+                }
+            }
+            c = db.rawQuery(sql, args);
+            if (c.moveToFirst()) return c.getInt(0) > 0;
+            return false;
+        } finally {
+            if (c != null) c.close();
+            db.close();
+        }
+    }
 }

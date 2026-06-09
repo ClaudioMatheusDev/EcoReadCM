@@ -86,10 +86,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_LEITURA);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_APARTAMENTO);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_PROPRIETARIO);
-        onCreate(db);
+        // ATENÇÃO: nunca use DROP TABLE aqui — todos os dados do usuário serão perdidos.
+        // Implemente migrações incrementais com ALTER TABLE.
+        // Exemplo:
+        // if (oldVersion < 2) {
+        //     db.execSQL("ALTER TABLE " + TABLE_PROPRIETARIO + " ADD COLUMN email TEXT");
+        // }
     }
 
     @Override

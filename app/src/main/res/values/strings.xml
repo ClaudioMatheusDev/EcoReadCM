@@ -27,4 +27,19 @@
     <string name="bloco">Bloco (opcional)</string>
     <string name="valor_luz">Eletricidade (kWh)</string>
     <string name="valor_gas">Gás (m³)</string>
+    <string name="condominioNome">Condomínio Parque Verde</string>
+    <string name="buscar_apartamento">Buscar apartamento…</string>
+    <string name="sem_proprietarios">Nenhum proprietário cadastrado.
+Toque em + para adicionar.</string>
+    <string name="sem_apartamentos">Nenhum apartamento cadastrado.
+Toque em + para adicionar.</string>
+    <string name="sem_leituras">Nenhuma leitura registrada.
+Toque em + para adicionar a primeira leitura.</string>
+    <string name="sem_leituras_mes">Nenhuma leitura coletada neste mês ainda.</string>
+    <string name="cpf_invalido">CPF inválido. Informe os 11 dígitos numéricos.</string>
+    <string name="apartamento_duplicado">Já existe um apartamento com este número neste bloco.</string>
+    <string name="confirmar_exclusao">Confirmar exclusão</string>
+    <string name="excluir_leitura_msg">Deseja realmente excluir esta leitura? A ação não pode ser desfeita.</string>
+    <string name="media_por_unidade">Média por unidade (última leitura)</string>
+    <string name="valor_invalido">Valor inválido. Informe um número positivo.</string>
 </resources>

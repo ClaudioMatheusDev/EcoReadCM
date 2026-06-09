@@ -1,6 +1,8 @@
 package com.example.ecoreadcm.ui;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -24,6 +26,8 @@ import com.example.ecoreadcm.model.Leitura;
 
 import java.util.Calendar;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class NovaLeituraActivity extends AppCompatActivity {
 
@@ -37,6 +41,9 @@ public class NovaLeituraActivity extends AppCompatActivity {
     private Button btnSalvar;
 
     private long apartamentoPreSelecionado = -1;
+
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final Handler uiHandler = new Handler(Looper.getMainLooper());
 
     private static final String[] MESES_NOMES = {
             "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
@@ -72,14 +79,24 @@ public class NovaLeituraActivity extends AppCompatActivity {
     }
 
     private void carregarSpinners() {
-        // Apartamentos
-        listaApartamentos = apartamentoDAO.listarTodos();
-        if (listaApartamentos.isEmpty()) {
-            Toast.makeText(this, "Cadastre apartamentos antes de registrar leituras", Toast.LENGTH_LONG).show();
-            finish();
-            return;
-        }
+        btnSalvar.setEnabled(false);
+        executor.execute(() -> {
+            List<Apartamento> apts = apartamentoDAO.listarTodos();
+            uiHandler.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                listaApartamentos = apts;
+                if (listaApartamentos.isEmpty()) {
+                    Toast.makeText(this, "Cadastre apartamentos antes de registrar leituras", Toast.LENGTH_LONG).show();
+                    finish();
+                    return;
+                }
+                configurarSpinners();
+                btnSalvar.setEnabled(true);
+            });
+        });
+    }
 
+    private void configurarSpinners() {
         String[] aptNomes = new String[listaApartamentos.size()];
         int selecaoInicial = 0;
         for (int i = 0; i < listaApartamentos.size(); i++) {
@@ -110,14 +127,15 @@ public class NovaLeituraActivity extends AppCompatActivity {
             public void onNothingSelected(AdapterView<?> p) {}
         });
 
-        // Anos
+        // Anos: 5 anos atrás até 1 ano à frente (7 opções)
         int anoAtual = cal.get(Calendar.YEAR);
-        String[] anos = {String.valueOf(anoAtual - 1), String.valueOf(anoAtual), String.valueOf(anoAtual + 1)};
+        String[] anos = new String[7];
+        for (int i = 0; i < 7; i++) anos[i] = String.valueOf(anoAtual - 5 + i);
         ArrayAdapter<String> anoAdapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_item, anos);
         anoAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerAno.setAdapter(anoAdapter);
-        spinnerAno.setSelection(1);
+        spinnerAno.setSelection(5); // índice 5 = anoAtual
         spinnerAno.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             public void onItemSelected(AdapterView<?> p, View v, int pos, long id) { verificarDuplicidade(); }
             public void onNothingSelected(AdapterView<?> p) {}
@@ -125,23 +143,31 @@ public class NovaLeituraActivity extends AppCompatActivity {
     }
 
     private void verificarDuplicidade() {
+        if (listaApartamentos == null) return;
         int aptPos = spinnerApartamento.getSelectedItemPosition();
         if (aptPos < 0 || aptPos >= listaApartamentos.size()) return;
 
-        long aptId = listaApartamentos.get(aptPos).getId();
-        int mes = spinnerMes.getSelectedItemPosition() + 1;
-        int ano = Integer.parseInt(spinnerAno.getSelectedItem().toString());
+        final long aptId = listaApartamentos.get(aptPos).getId();
+        final int mes = spinnerMes.getSelectedItemPosition() + 1;
+        final int ano = Integer.parseInt(spinnerAno.getSelectedItem().toString());
 
-        if (leituraDAO.leituraJaExiste(aptId, mes, ano)) {
-            tvAviso.setVisibility(View.VISIBLE);
-            tvAviso.setText("⚠ Já existe leitura para " + MESES_NOMES[mes - 1] + "/" + ano +
-                    ". Salvar irá substituí-la.");
-        } else {
-            tvAviso.setVisibility(View.GONE);
-        }
+        executor.execute(() -> {
+            boolean existe = leituraDAO.leituraJaExiste(aptId, mes, ano);
+            uiHandler.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (existe) {
+                    tvAviso.setVisibility(View.VISIBLE);
+                    tvAviso.setText("⚠ Já existe leitura para " + MESES_NOMES[mes - 1] + "/" + ano +
+                            ". Salvar irá substituí-la.");
+                } else {
+                    tvAviso.setVisibility(View.GONE);
+                }
+            });
+        });
     }
 
     private void salvarLeitura() {
+        if (listaApartamentos == null) return;
         int aptPos = spinnerApartamento.getSelectedItemPosition();
         if (aptPos < 0) { Toast.makeText(this, "Selecione um apartamento", Toast.LENGTH_SHORT).show(); return; }
 
@@ -153,7 +179,7 @@ public class NovaLeituraActivity extends AppCompatActivity {
             return;
         }
 
-        double valorLuz, valorGas;
+        final double valorLuz, valorGas;
         try {
             valorLuz = Double.parseDouble(strLuz);
             valorGas = Double.parseDouble(strGas);
@@ -167,30 +193,51 @@ public class NovaLeituraActivity extends AppCompatActivity {
             return;
         }
 
-        long aptId = listaApartamentos.get(aptPos).getId();
+        final long aptId = listaApartamentos.get(aptPos).getId();
+        final int mes = spinnerMes.getSelectedItemPosition() + 1;
+        final int ano = Integer.parseInt(spinnerAno.getSelectedItem().toString());
 
-        // RF integridade: verificar se apartamento existe
-        if (!apartamentoDAO.apartamentoExiste(aptId)) {
-            Toast.makeText(this, "Apartamento inválido", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        btnSalvar.setEnabled(false);
+        executor.execute(() -> {
+            if (!apartamentoDAO.apartamentoExiste(aptId)) {
+                uiHandler.post(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    btnSalvar.setEnabled(true);
+                    Toast.makeText(this, "Apartamento inválido", Toast.LENGTH_SHORT).show();
+                });
+                return;
+            }
 
-        int mes = spinnerMes.getSelectedItemPosition() + 1;
-        int ano = Integer.parseInt(spinnerAno.getSelectedItem().toString());
+            Leitura existente = leituraDAO.buscarPorApartamentoMesAno(aptId, mes, ano);
+            String mensagem;
+            if (existente != null) {
+                existente.setValorLuz(valorLuz);
+                existente.setValorGas(valorGas);
+                leituraDAO.atualizar(existente);
+                mensagem = "Leitura atualizada com sucesso!";
+            } else {
+                Leitura nova = new Leitura(aptId, mes, ano, valorLuz, valorGas);
+                long newId = leituraDAO.inserir(nova);
+                mensagem = newId > 0 ? "Leitura registrada com sucesso!" : null;
+            }
 
-        // Se já existe, atualizar
-        Leitura existente = leituraDAO.buscarPorApartamentoMesAno(aptId, mes, ano);
-        if (existente != null) {
-            existente.setValorLuz(valorLuz);
-            existente.setValorGas(valorGas);
-            leituraDAO.atualizar(existente);
-            Toast.makeText(this, "Leitura atualizada com sucesso!", Toast.LENGTH_SHORT).show();
-        } else {
-            Leitura nova = new Leitura(aptId, mes, ano, valorLuz, valorGas);
-            long id = leituraDAO.inserir(nova);
-            if (id > 0) Toast.makeText(this, "Leitura registrada com sucesso!", Toast.LENGTH_SHORT).show();
-            else { Toast.makeText(this, "Erro ao salvar leitura", Toast.LENGTH_SHORT).show(); return; }
-        }
-        finish();
+            final String finalMsg = mensagem;
+            uiHandler.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (finalMsg != null) {
+                    Toast.makeText(this, finalMsg, Toast.LENGTH_SHORT).show();
+                    finish();
+                } else {
+                    btnSalvar.setEnabled(true);
+                    Toast.makeText(this, "Erro ao salvar leitura", Toast.LENGTH_SHORT).show();
+                }
+            });
+        });
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        executor.shutdownNow();
     }
 }

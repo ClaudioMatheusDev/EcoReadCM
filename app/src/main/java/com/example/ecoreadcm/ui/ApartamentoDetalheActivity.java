@@ -1,6 +1,8 @@
 package com.example.ecoreadcm.ui;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.TextView;
@@ -23,6 +25,8 @@ import com.google.android.material.chip.Chip;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class ApartamentoDetalheActivity extends AppCompatActivity {
 
@@ -37,7 +41,11 @@ public class ApartamentoDetalheActivity extends AppCompatActivity {
     private TextView tvMediaLuz, tvMediaGas;
     private TextView tvAvisoMeses;
     private RecyclerView rvLeituras;
+    private android.widget.TextView tvEmpty;
     private Chip chip3Meses, chip6Meses;
+
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final Handler uiHandler = new Handler(Looper.getMainLooper());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,6 +79,7 @@ public class ApartamentoDetalheActivity extends AppCompatActivity {
         tvMediaLuz = findViewById(R.id.tvMediaLuz);
         tvMediaGas = findViewById(R.id.tvMediaGas);
         tvAvisoMeses = findViewById(R.id.tvAvisoMeses);
+        tvEmpty = findViewById(R.id.tvEmpty);
         rvLeituras = findViewById(R.id.rvLeituras);
         rvLeituras.setLayoutManager(new LinearLayoutManager(this));
 
@@ -100,59 +109,62 @@ public class ApartamentoDetalheActivity extends AppCompatActivity {
     }
 
     private void carregarDados() {
-        Apartamento apt = apartamentoDAO.buscarPorId(apartamentoId);
-        if (apt == null) { finish(); return; }
+        executor.execute(() -> {
+            Apartamento apt = apartamentoDAO.buscarPorId(apartamentoId);
+            if (apt == null) { uiHandler.post(this::finish); return; }
 
-        tvAptNumero.setText("Apartamento " + apt.getNumero());
-        String subtitulo = apt.getProprietarioNome() != null ? apt.getProprietarioNome() : "";
-        if (apt.getBloco() != null && !apt.getBloco().isEmpty())
-            subtitulo += (subtitulo.isEmpty() ? "" : " · ") + "Bloco " + apt.getBloco();
-        tvAptSubtitulo.setText(subtitulo);
+            Leitura ultima = leituraDAO.buscarUltimaLeitura(apartamentoId);
+            List<Leitura> leituras = leituraDAO.listarPorApartamento(apartamentoId);
+            int totalLeituras = leituras.size();
 
-        // Última leitura
-        Leitura ultima = leituraDAO.buscarUltimaLeitura(apartamentoId);
-        if (ultima != null) {
-            tvUltimaLuz.setText(String.format("%.1f kWh", ultima.getValorLuz()));
-            tvUltimaGas.setText(String.format("%.1f m³", ultima.getValorGas()));
-        } else {
-            tvUltimaLuz.setText("—");
-            tvUltimaGas.setText("—");
-        }
+            double mediaLuz = leituraDAO.calcularMediaLuz(apartamentoId, periodoSelecionado);
+            double mediaGas = leituraDAO.calcularMediaGas(apartamentoId, periodoSelecionado);
 
-        atualizarMedias();
+            uiHandler.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
 
-        // Lista de leituras
-        List<Leitura> leituras = leituraDAO.listarPorApartamento(apartamentoId);
-        LeituraAdapter adapter = new LeituraAdapter(leituras, leitura -> mostrarDialogEditarLeitura(leitura));
-        rvLeituras.setAdapter(adapter);
+                tvAptNumero.setText("Apartamento " + apt.getNumero());
+                String subtitulo = apt.getProprietarioNome() != null ? apt.getProprietarioNome() : "";
+                if (apt.getBloco() != null && !apt.getBloco().isEmpty())
+                    subtitulo += (subtitulo.isEmpty() ? "" : " · ") + "Bloco " + apt.getBloco();
+                tvAptSubtitulo.setText(subtitulo);
+
+                if (ultima != null) {
+                    tvUltimaLuz.setText(String.format("%.1f kWh", ultima.getValorLuz()));
+                    tvUltimaGas.setText(String.format("%.1f m³", ultima.getValorGas()));
+                } else {
+                    tvUltimaLuz.setText("—");
+                    tvUltimaGas.setText("—");
+                }
+
+                // Médias
+                if (totalLeituras == 0) {
+                    tvMediaLuz.setText("—");
+                    tvMediaGas.setText("—");
+                    tvAvisoMeses.setVisibility(View.VISIBLE);
+                    tvAvisoMeses.setText("Nenhuma leitura registrada ainda.");
+                } else {
+                    if (periodoSelecionado == 6 && totalLeituras < 6) {
+                        tvAvisoMeses.setVisibility(View.VISIBLE);
+                        tvAvisoMeses.setText("Apenas " + totalLeituras + " leitura(s) disponível(is). " +
+                                "Média calculada com os dados existentes.");
+                    } else {
+                        tvAvisoMeses.setVisibility(View.GONE);
+                    }
+                    tvMediaLuz.setText(String.format("%.1f kWh", mediaLuz));
+                    tvMediaGas.setText(String.format("%.1f m³", mediaGas));
+                }
+
+                LeituraAdapter adapter = new LeituraAdapter(leituras, leitura -> mostrarDialogEditarLeitura(leitura));
+                rvLeituras.setAdapter(adapter);
+                tvEmpty.setVisibility(leituras.isEmpty() ? View.VISIBLE : View.GONE);
+                rvLeituras.setVisibility(leituras.isEmpty() ? View.GONE : View.VISIBLE);
+            });
+        });
     }
 
     private void atualizarMedias() {
-        int totalLeituras = leituraDAO.contarLeituras(apartamentoId);
-
-        // RF04: tratar caso de leituras insuficientes
-        if (totalLeituras == 0) {
-            tvMediaLuz.setText("—");
-            tvMediaGas.setText("—");
-            tvAvisoMeses.setVisibility(View.VISIBLE);
-            tvAvisoMeses.setText("Nenhuma leitura registrada ainda.");
-            return;
-        }
-
-        if (periodoSelecionado == 6 && totalLeituras < 6) {
-            tvAvisoMeses.setVisibility(View.VISIBLE);
-            tvAvisoMeses.setText(
-                    "Apenas " + totalLeituras + " leitura(s) disponível(is). " +
-                            "Média calculada com os dados existentes."
-            );
-        } else {
-            tvAvisoMeses.setVisibility(View.GONE);
-        }
-
-        double mediaLuz = leituraDAO.calcularMediaLuz(apartamentoId, periodoSelecionado);
-        double mediaGas = leituraDAO.calcularMediaGas(apartamentoId, periodoSelecionado);
-        tvMediaLuz.setText(String.format("%.1f kWh", mediaLuz));
-        tvMediaGas.setText(String.format("%.1f m³", mediaGas));
+        carregarDados(); // Re-usa o carregamento completo para consistência
     }
 
     private void mostrarDialogEditarLeitura(Leitura leitura) {
@@ -161,31 +173,65 @@ public class ApartamentoDetalheActivity extends AppCompatActivity {
 
         android.widget.EditText etLuz = view.findViewById(R.id.etValorLuz);
         android.widget.EditText etGas = view.findViewById(R.id.etValorGas);
-        etLuz.setText(String.valueOf(leitura.getValorLuz()));
-        etGas.setText(String.valueOf(leitura.getValorGas()));
+        // Formata sem casas desnecessárias (ex: 150 em vez de 150.0)
+        etLuz.setText(leitura.getValorLuz() % 1 == 0
+                ? String.valueOf((int) leitura.getValorLuz())
+                : String.format("%.2f", leitura.getValorLuz()));
+        etGas.setText(leitura.getValorGas() % 1 == 0
+                ? String.valueOf((int) leitura.getValorGas())
+                : String.format("%.2f", leitura.getValorGas()));
 
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Editar " + leitura.getPeriodoFormatado())
                 .setView(view)
                 .setPositiveButton("Salvar", (dialog, which) -> {
                     try {
-                        double luz = Double.parseDouble(etLuz.getText().toString());
-                        double gas = Double.parseDouble(etGas.getText().toString());
+                        double luz = Double.parseDouble(etLuz.getText().toString().trim());
+                        double gas = Double.parseDouble(etGas.getText().toString().trim());
+                        if (luz < 0 || gas < 0) {
+                            Toast.makeText(this, getString(R.string.valor_invalido), Toast.LENGTH_SHORT).show();
+                            return;
+                        }
                         leitura.setValorLuz(luz);
                         leitura.setValorGas(gas);
-                        leituraDAO.atualizar(leitura);
-                        Toast.makeText(this, "Leitura atualizada", Toast.LENGTH_SHORT).show();
-                        carregarDados();
+                        executor.execute(() -> {
+                            leituraDAO.atualizar(leitura);
+                            uiHandler.post(() -> {
+                                if (isFinishing() || isDestroyed()) return;
+                                Toast.makeText(this, "Leitura atualizada", Toast.LENGTH_SHORT).show();
+                                carregarDados();
+                            });
+                        });
                     } catch (NumberFormatException e) {
                         Toast.makeText(this, "Valores inválidos", Toast.LENGTH_SHORT).show();
                     }
                 })
-                .setNeutralButton("Excluir", (dialog, which) -> {
-                    leituraDAO.deletar(leitura.getId());
-                    Toast.makeText(this, "Leitura removida", Toast.LENGTH_SHORT).show();
-                    carregarDados();
+                .setNeutralButton("Excluir", (dialog, which) -> confirmarExclusaoLeitura(leitura))
+                .setNegativeButton("Cancelar", null)
+                .show();
+    }
+
+    private void confirmarExclusaoLeitura(Leitura leitura) {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(getString(R.string.confirmar_exclusao))
+                .setMessage(getString(R.string.excluir_leitura_msg))
+                .setPositiveButton("Excluir", (d, w) -> {
+                    executor.execute(() -> {
+                        leituraDAO.deletar(leitura.getId());
+                        uiHandler.post(() -> {
+                            if (isFinishing() || isDestroyed()) return;
+                            Toast.makeText(this, "Leitura removida", Toast.LENGTH_SHORT).show();
+                            carregarDados();
+                        });
+                    });
                 })
                 .setNegativeButton("Cancelar", null)
                 .show();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        executor.shutdownNow();
     }
 }

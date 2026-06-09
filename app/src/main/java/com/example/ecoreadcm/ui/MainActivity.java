@@ -12,6 +12,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -29,9 +32,6 @@ import com.example.ecoreadcm.model.Proprietario;
 import com.example.ecoreadcm.ui.adapters.ProprietarioAdapter;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
-import java.util.Calendar;
-import java.util.List;
-
 public class MainActivity extends AppCompatActivity {
 
     private IProprietarioDAO proprietarioDAO;
@@ -41,6 +41,10 @@ public class MainActivity extends AppCompatActivity {
     private RecyclerView rvProprietarios;
     private TextView tvMediaLuz, tvMediaGas, tvTotalUnidades;
     private LinearLayout btnProprietarios, btnUnidades, btnRelatorios;
+
+    // Instâncias do Adapter e da Lista mantidas no escopo da classe para reaproveitamento de memória
+    private ProprietarioAdapter adapter;
+    private final List<Proprietario> listaProprietarios = new ArrayList<>();
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
@@ -69,8 +73,18 @@ public class MainActivity extends AppCompatActivity {
         tvMediaLuz = findViewById(R.id.tvMediaLuz);
         tvMediaGas = findViewById(R.id.tvMediaGas);
         tvTotalUnidades = findViewById(R.id.tvTotalUnidades);
+        
         rvProprietarios = findViewById(R.id.rvProprietarios);
         rvProprietarios.setLayoutManager(new LinearLayoutManager(this));
+
+        // Inicializa o adapter uma única vez vinculando-o à lista persistente da classe.
+        // Isso impede o aviso "No adapter attached" no Logcat.
+        adapter = new ProprietarioAdapter(listaProprietarios, proprietario -> {
+            Intent intent = new Intent(this, ProprietarioDetalheActivity.class);
+            intent.putExtra("proprietario_id", proprietario.getId());
+            startActivity(intent);
+        });
+        rvProprietarios.setAdapter(adapter);
 
         TextView tvVerTodos = findViewById(R.id.tvVerTodos);
         tvVerTodos.setOnClickListener(v -> abrirProprietarios());
@@ -102,6 +116,7 @@ public class MainActivity extends AppCompatActivity {
 
             double somaLuz = 0, somaGas = 0;
             int count = 0;
+            
             for (Apartamento apt : apartamentos) {
                 Leitura ultima = leituraDAO.buscarUltimaLeitura(apt.getId());
                 if (ultima != null) {
@@ -113,8 +128,8 @@ public class MainActivity extends AppCompatActivity {
             final double mediaLuz = count > 0 ? somaLuz / count : -1;
             final double mediaGas = count > 0 ? somaGas / count : -1;
 
-            List<Proprietario> proprietarios = proprietarioDAO.listarTodos();
-            for (Proprietario p : proprietarios) {
+            List<Proprietario> proprietariosNovos = proprietarioDAO.listarTodos();
+            for (Proprietario p : proprietariosNovos) {
                 p.setApartamentos(apartamentoDAO.listarPorProprietario(p.getId()));
             }
 
@@ -131,12 +146,11 @@ public class MainActivity extends AppCompatActivity {
                     tvMediaGas.setText("--");
                 }
 
-                ProprietarioAdapter adapter = new ProprietarioAdapter(proprietarios, proprietario -> {
-                    Intent intent = new Intent(this, ProprietarioDetalheActivity.class);
-                    intent.putExtra("proprietario_id", proprietario.getId());
-                    startActivity(intent);
-                });
-                rvProprietarios.setAdapter(adapter);
+                // Em vez de recriar o Adapter, limpamos e atualizamos a lista monitorada por ele.
+                // Isso reduz drasticamente a alocação de memória e evita engasgos visuais (Davey!).
+                listaProprietarios.clear();
+                listaProprietarios.addAll(proprietariosNovos);
+                adapter.notifyDataSetChanged();
             });
         });
     }
@@ -155,5 +169,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void abrirLeiturasDoMes() {
         startActivity(new Intent(this, LeiturasDoMesActivity.class));
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        executor.shutdownNow();
     }
 }

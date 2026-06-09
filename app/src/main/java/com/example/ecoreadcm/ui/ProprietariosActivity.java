@@ -2,8 +2,11 @@ package com.example.ecoreadcm.ui;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.TextView;
@@ -24,6 +27,8 @@ import com.example.ecoreadcm.model.Proprietario;
 import com.example.ecoreadcm.ui.adapters.ProprietarioAdapter;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class ProprietariosActivity extends AppCompatActivity {
 
@@ -32,6 +37,10 @@ public class ProprietariosActivity extends AppCompatActivity {
     private RecyclerView rvProprietarios;
     private EditText etBusca;
     private TextView tvContagem;
+    private android.widget.TextView tvEmpty;
+
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final Handler uiHandler = new Handler(Looper.getMainLooper());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,6 +68,7 @@ public class ProprietariosActivity extends AppCompatActivity {
         fab.setOnClickListener(v -> mostrarDialogCadastro(null));
 
         tvContagem = findViewById(R.id.tvContagem);
+        tvEmpty = findViewById(R.id.tvEmpty);
         rvProprietarios = findViewById(R.id.rvProprietarios);
         rvProprietarios.setLayoutManager(new LinearLayoutManager(this));
 
@@ -73,23 +83,30 @@ public class ProprietariosActivity extends AppCompatActivity {
     }
 
     private void carregarLista(String filtro) {
-        List<Proprietario> lista = filtro.isEmpty()
-                ? proprietarioDAO.listarTodos()
-                : proprietarioDAO.buscarPorNome(filtro);
+        executor.execute(() -> {
+            List<Proprietario> lista = filtro.isEmpty()
+                    ? proprietarioDAO.listarTodos()
+                    : proprietarioDAO.buscarPorNome(filtro);
 
-        for (Proprietario p : lista) {
-            p.setApartamentos(apartamentoDAO.listarPorProprietario(p.getId()));
-        }
+            for (Proprietario p : lista) {
+                p.setApartamentos(apartamentoDAO.listarPorProprietario(p.getId()));
+            }
 
-        tvContagem.setText(lista.size() + " proprietário(s) cadastrado(s)");
+            uiHandler.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                tvContagem.setText(lista.size() + " proprietário(s) cadastrado(s)");
+                tvEmpty.setVisibility(lista.isEmpty() ? View.VISIBLE : View.GONE);
+                rvProprietarios.setVisibility(lista.isEmpty() ? View.GONE : View.VISIBLE);
 
-        ProprietarioAdapter adapter = new ProprietarioAdapter(lista, proprietario -> {
-            Intent intent = new Intent(this, ProprietarioDetalheActivity.class);
-            intent.putExtra("proprietario_id", proprietario.getId());
-            startActivity(intent);
+                ProprietarioAdapter adapter = new ProprietarioAdapter(lista, proprietario -> {
+                    Intent intent = new Intent(this, ProprietarioDetalheActivity.class);
+                    intent.putExtra("proprietario_id", proprietario.getId());
+                    startActivity(intent);
+                });
+                adapter.setOnLongClickListener(proprietario -> mostrarDialogOpcoes(proprietario));
+                rvProprietarios.setAdapter(adapter);
+            });
         });
-        adapter.setOnLongClickListener(proprietario -> mostrarDialogOpcoes(proprietario));
-        rvProprietarios.setAdapter(adapter);
     }
 
     private void mostrarDialogCadastro(Proprietario existente) {
@@ -121,7 +138,15 @@ public class ProprietariosActivity extends AppCompatActivity {
                         return;
                     }
 
-                    if (!editando && proprietarioDAO.cpfJaCadastrado(cpf)) {
+                    if (!editando && !validarCpf(cpf)) {
+                        Toast.makeText(this, getString(R.string.cpf_invalido), Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    // Normaliza CPF para apenas dígitos antes de salvar
+                    final String cpfLimpo = cpf.replaceAll("[^0-9]", "");
+
+                    if (!editando && proprietarioDAO.cpfJaCadastrado(cpfLimpo)) {
                         Toast.makeText(this, "CPF já cadastrado", Toast.LENGTH_SHORT).show();
                         return;
                     }
@@ -129,15 +154,26 @@ public class ProprietariosActivity extends AppCompatActivity {
                     if (editando) {
                         existente.setNome(nome);
                         existente.setContato(contato);
-                        proprietarioDAO.atualizar(existente);
-                        Toast.makeText(this, "Proprietário atualizado", Toast.LENGTH_SHORT).show();
+                        executor.execute(() -> {
+                            proprietarioDAO.atualizar(existente);
+                            uiHandler.post(() -> {
+                                if (isFinishing() || isDestroyed()) return;
+                                Toast.makeText(this, "Proprietário atualizado", Toast.LENGTH_SHORT).show();
+                                carregarLista(etBusca.getText().toString());
+                            });
+                        });
                     } else {
-                        Proprietario novo = new Proprietario(nome, cpf, contato);
-                        long id = proprietarioDAO.inserir(novo);
-                        if (id > 0) Toast.makeText(this, "Proprietário cadastrado", Toast.LENGTH_SHORT).show();
-                        else Toast.makeText(this, "Erro ao cadastrar", Toast.LENGTH_SHORT).show();
+                        Proprietario novo = new Proprietario(nome, cpfLimpo, contato);
+                        executor.execute(() -> {
+                            long id = proprietarioDAO.inserir(novo);
+                            uiHandler.post(() -> {
+                                if (isFinishing() || isDestroyed()) return;
+                                if (id > 0) Toast.makeText(this, "Proprietário cadastrado", Toast.LENGTH_SHORT).show();
+                                else Toast.makeText(this, "Erro ao cadastrar", Toast.LENGTH_SHORT).show();
+                                carregarLista(etBusca.getText().toString());
+                            });
+                        });
                     }
-                    carregarLista(etBusca.getText().toString());
                 })
                 .setNegativeButton("Cancelar", null)
                 .show();
@@ -158,11 +194,44 @@ public class ProprietariosActivity extends AppCompatActivity {
                 .setTitle("Excluir proprietário?")
                 .setMessage("Todos os apartamentos vinculados também serão removidos.")
                 .setPositiveButton("Excluir", (d, w) -> {
-                    proprietarioDAO.deletar(proprietario.getId());
-                    Toast.makeText(this, "Proprietário removido", Toast.LENGTH_SHORT).show();
-                    carregarLista(etBusca.getText().toString());
+                    executor.execute(() -> {
+                        proprietarioDAO.deletar(proprietario.getId());
+                        uiHandler.post(() -> {
+                            if (isFinishing() || isDestroyed()) return;
+                            Toast.makeText(this, "Proprietário removido", Toast.LENGTH_SHORT).show();
+                            carregarLista(etBusca.getText().toString());
+                        });
+                    });
                 })
                 .setNegativeButton("Cancelar", null)
                 .show();
+    }
+
+    /**
+     * Valida CPF pelo algoritmo dos dígitos verificadores (Módulo 11).
+     * Aceita CPF com ou sem formatação (xxx.xxx.xxx-xx).
+     */
+    private static boolean validarCpf(String cpf) {
+        cpf = cpf.replaceAll("[^0-9]", "");
+        if (cpf.length() != 11) return false;
+        if (cpf.matches("(\\d)\\1{10}")) return false; // rejeita 000...0, 111...1, etc.
+
+        int soma = 0;
+        for (int i = 0; i < 9; i++) soma += (cpf.charAt(i) - '0') * (10 - i);
+        int primeiro = 11 - (soma % 11);
+        if (primeiro >= 10) primeiro = 0;
+        if (primeiro != (cpf.charAt(9) - '0')) return false;
+
+        soma = 0;
+        for (int i = 0; i < 10; i++) soma += (cpf.charAt(i) - '0') * (11 - i);
+        int segundo = 11 - (soma % 11);
+        if (segundo >= 10) segundo = 0;
+        return segundo == (cpf.charAt(10) - '0');
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        executor.shutdownNow();
     }
 }

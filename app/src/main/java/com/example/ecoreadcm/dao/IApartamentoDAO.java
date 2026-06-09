@@ -11,4 +11,5 @@ public interface IApartamentoDAO {
     List<Apartamento> listarPorProprietario(long proprietarioId);
     List<Apartamento> listarTodos();
     boolean apartamentoExiste(long id);
+    boolean verificarDuplicado(String numero, String bloco, long excluirId);
 }

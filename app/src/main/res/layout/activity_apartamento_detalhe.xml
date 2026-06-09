@@ -9,7 +9,7 @@
     <!-- Header escuro -->
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="vertical" android:background="@color/primaryDark"
-        android:paddingLeft="16dp" android:paddingRight="16dp"
+        android:paddingStart="16dp" android:paddingEnd="16dp"
         android:paddingTop="12dp" android:paddingBottom="20dp">
 
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
@@ -85,7 +85,7 @@
     <!-- Cards de médias -->
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingLeft="12dp" android:paddingRight="12dp" android:paddingBottom="8dp">
+        android:paddingStart="12dp" android:paddingEnd="12dp" android:paddingBottom="8dp">
 
         <androidx.cardview.widget.CardView android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:layout_marginEnd="6dp"
@@ -117,10 +117,22 @@
     <!-- Aviso leituras insuficientes RF04 -->
     <TextView android:id="@+id/tvAvisoMeses"
         android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:paddingLeft="16dp" android:paddingRight="16dp"
+        android:paddingStart="16dp" android:paddingEnd="16dp"
         android:paddingTop="6dp" android:paddingBottom="6dp"
         android:textSize="11sp" android:textColor="@color/amberDark"
         android:background="@color/amberLight"
+        android:visibility="gone" />
+
+    <!-- Estado vazio para leituras -->
+    <TextView
+        android:id="@+id/tvEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/sem_leituras"
+        android:textSize="13sp"
+        android:textColor="@color/textHint"
+        android:gravity="center"
+        android:padding="24dp"
         android:visibility="gone" />
 
     <androidx.recyclerview.widget.RecyclerView
@@ -128,8 +140,8 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:paddingLeft="12dp"
-        android:paddingRight="12dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
         android:paddingTop="8dp"
         android:clipToPadding="false" />
 
